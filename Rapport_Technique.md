@@ -1,114 +1,114 @@
-# Rapport Technique Détaillé : Conception d'un Cluster MPI Hétérogène CPU avec LTSP et Ansible
+# Detailed Technical Report: Design of a Heterogeneous CPU MPI Cluster with LTSP and Ansible
 
 ---
 
-## 👥 Informations Générales
-*   **Projet :** Conception et Déploiement d'un Cluster de Calcul Haute Performance (HPC)
-*   **Auteur :** `youcef`
-*   **Date de Rendu :** Mai 2026
-*   **Cadre Académique :** Projet d'Architecture des Systèmes Distribués et HPC
-*   **Université / Établissement :** Module Calcul Haute Performance (CHP)
+## 👥 General Information
+*   **Project:** Design and Deployment of a High-Performance Computing (HPC) Cluster
+*   **Author:** `youcef`
+*   **Submission Date:** May 2026
+*   **Academic Framework:** Distributed Systems Architecture & HPC Project
+*   **University / Institution:** High-Performance Computing (HPC) Module
 
 ---
 
-## 📑 Table des Matières
-1.  **Contexte et Objectifs**
-2.  **Architecture du Cluster (Matérielle & Logique)**
-3.  **Partie 1 : Mise en Place de LTSP et Démarrage Réseau**
-    *   *Configuration Réseau*
-    *   *Configuration LTSP*
-    *   *Résolution Critique du Bug SSH des Clients Sans Disque*
-4.  **Partie 2 : Automatisation avec Ansible**
-    *   *Conception du Playbook Dynamique*
-    *   *Génération Automatique du Hostfile OpenMPI*
-5.  **Partie 3 : Déploiement et Test MPI**
-    *   *Vérification de la Connectivité Distribuée*
-6.  **Partie 4 : Expérimentation et Analyse des Performances**
-    *   *Benchmark de Multiplication de Matrices Parallèle*
-    *   *Résultats et Tableau des Mesures*
-    *   *Analyse Académique (Amdahl, Gustafson et Impact Réseau)*
-7.  **Extensions et Perspectives d'Équilibrage**
-    *   *Allocation Pondérée des Processus*
-    *   *Pistes d'Améliorations Systèmes*
+## 📑 Table of Contents
+1.  **Context and Objectives**
+2.  **Cluster Architecture (Hardware & Logical)**
+3.  **Part 1: LTSP Setup and Network Booting**
+    *   *Network Configuration*
+    *   *LTSP Configuration*
+    *   *Critical Troubleshooting of the Diskless Client SSH Bug*
+4.  **Part 2: Automation with Ansible**
+    *   *Dynamic Playbook Design*
+    *   *Automatic OpenMPI Hostfile Generation*
+5.  **Part 3: MPI Deployment and Verification**
+    *   *Distributed Connectivity Verification*
+6.  **Part 4: Experimentation and Performance Analysis**
+    *   *Parallel Matrix Multiplication Benchmark*
+    *   *Results and Measurements Table*
+    *   *Academic Performance Analysis (Amdahl, Gustafson, and Network Overhead)*
+7.  **Extensions and Load Balancing Perspectives**
+    *   *Weighted Process Allocation*
+    *   *Systems-Level Improvement Proposals*
 8.  **Conclusion**
 
 ---
 
-## 1. Contexte et Objectifs
+## 1. Context and Objectives
 
-### 1.1 Contexte Technique
-Les systèmes de calcul haute performance (HPC) reposent historiquement sur des supercalculateurs extrêmement onéreux. Aujourd'hui, l'essor du matériel grand public et des logiciels libres permet de concevoir des clusters de calcul à faible coût en regroupant des machines standard. 
+### 1.1 Technical Context
+High-performance computing (HPC) systems have historically relied on extremely expensive dedicated supercomputing hardware. Today, the rise of commodity off-the-shelf hardware and open-source software makes it possible to design low-cost computing clusters by grouping standard machines together.
 
-Cependant, administrer individuellement chaque machine d'un grand cluster pose des problèmes majeurs d'évolutivité, de cohérence des configurations système, et de synchronisation des systèmes de fichiers.
+However, individually managing every node in a large cluster introduces major scalability challenges, system configuration inconsistencies, and file system synchronization overhead.
 
-Ce projet répond à cette problématique en concevant un cluster hétérogène CPU où :
-*   **LTSP (Linux Terminal Server Project)** centralise le système d'exploitation. Les machines esclaves démarrent sans disque dur via le réseau (PXE) en chargeant une image SquashFS identique générée à partir du serveur maître.
-*   **NFS (Network File System)** fournit un espace utilisateur (`/home`) partagé en temps réel et de manière transparente.
-*   **Ansible** automatise la découverte dynamique des adresses IP attribuées aux nœuds du cluster et génère la configuration d'exécution.
-*   **OpenMPI** orchestre l'exécution parallèle distribuée sur l'ensemble des cœurs de calcul disponibles.
+This project addresses these challenges by designing a heterogeneous CPU cluster where:
+*   **LTSP (Linux Terminal Server Project)** centralizes the operating system. Slave machines run entirely diskless, booting via the network (PXE) by loading an identical SquashFS system image generated directly from the Master server.
+*   **NFS (Network File System)** provides a shared user space (`/home`) dynamically and transparently in real-time.
+*   **Ansible** automates infrastructure discovery by identifying dynamic IP addresses allocated to cluster nodes and compiling the execution configurations.
+*   **OpenMPI** orchestrates parallel distributed execution across all available calculation cores.
 
-### 1.2 Objectifs Pédagogiques
-*   **Architecture Distribuée :** Comprendre le fonctionnement interne d'un cluster, le rôle du nœud maître (Master) et des nœuds esclaves (Workers / Slaves).
-*   **Déploiement Réseau (Diskless Booting) :** Configurer les services DHCP, TFTP et iPXE pour démarrer des machines physiques ou virtuelles via leur carte réseau.
-*   **Ingénierie DevOps/SysAdmin :** Automatiser les configurations et la découverte d'infrastructure avec un outil d'orchestration (Ansible).
-*   **Programmation Parallèle :** Développer, tester, et évaluer un programme parallèle en C en utilisant l'interface de passage de messages MPI (Message Passing Interface).
-*   **Analyse Expérimentale :** Évaluer l'efficacité de la parallélisation et quantifier le coût des communications réseau par rapport au temps de calcul pur.
+### 1.2 Pedagogical Objectives
+*   **Distributed Architecture:** Understand cluster topologies, the role of the master node (Master) and computation worker nodes (Workers / Slaves).
+*   **Diskless Network Booting:** Configure DHCP, TFTP, and iPXE services to boot physical or virtual machines entirely via their network interface cards.
+*   **DevOps/SysAdmin Engineering:** Automate configurations and infrastructure auto-discovery using an orchestration engine (Ansible).
+*   **Parallel Programming:** Develop, test, and characterize a parallel C application using the Message Passing Interface (MPI) standard.
+*   **Experimental Characterization:** Quantify parallel speedup, computing efficiency, and evaluate network communication overhead relative to local computation.
 
 ---
 
-## 2. Architecture du Cluster (Matérielle & Logique)
+## 2. Cluster Architecture (Hardware & Logical)
 
-L'infrastructure repose sur une topologie de réseau interne isolée avec les spécifications suivantes :
+The infrastructure resides on a dedicated, isolated internal network with the following specifications:
 
-### 2.1 Spécifications du Nœud Maître (Master)
-*   **Système d'exploitation :** Linux Mint (64-bit)
-*   **Interface Réseau 1 (enp0s3 / NAT) :** Accès à Internet pour l'installation des dépendances.
-*   **Interface Réseau 2 (enp0s8 / Réseau Interne) :** Adresse IP statique `192.168.56.1/24`. Cette interface héberge les serveurs `dnsmasq` (DHCP, TFTP, DNS) et `nfs-kernel-server` (Partage `/home`).
-*   **Rôle :** Compilation des programmes, hébergement de l'image de boot réseau LTSP, exécution du playbook Ansible, et coordination globale du cluster OpenMPI (Rank 0).
+### 2.1 Master Node Specifications
+*   **Operating System:** Linux Mint (64-bit)
+*   **Network Interface 1 (enp0s3 / NAT):** External internet access for dependency installation.
+*   **Network Interface 2 (enp0s8 / Internal Network):** Static IP address `192.168.56.1/24`. This interface hosts `dnsmasq` (DHCP, TFTP, DNS) and `nfs-kernel-server` (sharing `/home`).
+*   **Role:** Compilation of C code, hosting the LTSP SquashFS boot image, executing the Ansible playbook, and coordinating the global OpenMPI execution (Rank 0).
 
-### 2.2 Spécifications des Nœuds Esclaves (Workers / Slaves)
-*   **Nœud Esclave 1 (ltsp181) :** Machine virtuelle sans disque dur (Diskless). IP dynamique fournie par le DHCP (`192.168.56.181`). Elle dispose de 2 cœurs CPU et démarre via iPXE en chargeant l'image système SquashFS du Master.
-*   **Nœud Esclave 2 (ltsp199) :** Machine virtuelle identique. IP dynamique (`192.168.56.199`). Elle dispose également de 2 cœurs CPU et démarre via le réseau.
+### 2.2 Slave Node Specifications (Workers / Slaves)
+*   **Slave Node 1 (ltsp181):** Diskless virtual machine. Dynamic IP address allocated by DHCP (`192.168.56.181`). It operates with 2 CPU cores and boots via network PXE loading the Master's SquashFS image.
+*   **Slave Node 2 (ltsp199):** Identical diskless virtual machine. Dynamic IP address (`192.168.56.199`). It operates with 2 CPU cores and boots via network PXE.
 
-### 2.3 Schéma d'Architecture Logique et Réseau
+### 2.3 Logical and Network Architecture Diagram
 
 ```mermaid
 graph TD
-    subgraph Réseau Public (Internet)
-        A[Passerelle Internet]
+    subgraph Public Network (Internet)
+        A[Internet Gateway]
     end
 
     subgraph Master VM (192.168.56.1)
-        B["Nœud Maître (Linux Mint)<br/>- dnsmasq (DHCP/TFTP)<br/>- NFS Server (/home)<br/>- Ansible Engine<br/>- OpenMPI (Rank 0)"]
+        B["Master Node (Linux Mint)<br/>- dnsmasq (DHCP/TFTP)<br/>- NFS Server (/home)<br/>- Ansible Engine<br/>- OpenMPI (Rank 0)"]
     end
 
-    subgraph Cluster Privé (LTSP Net 192.168.56.0/24)
-        C["Client Esclave 1 (ltsp181)<br/>- Sans Disque (PXE Boot)<br/>- NFS Client (/home)<br/>- OpenMPI (Rank 1 & 2)"]
-        D["Client Esclave 2 (ltsp199)<br/>- Sans Disque (PXE Boot)<br/>- NFS Client (/home)<br/>- OpenMPI (Rank 3 & 4)"]
+    subgraph Private Cluster (LTSP Net 192.168.56.0/24)
+        C["Client Slave 1 (ltsp181)<br/>- Diskless (PXE Boot)<br/>- NFS Client (/home)<br/>- OpenMPI (Rank 1 & 2)"]
+        D["Client Slave 2 (ltsp199)<br/>- Diskless (PXE Boot)<br/>- NFS Client (/home)<br/>- OpenMPI (Rank 3 & 4)"]
     end
 
     A -->|NAT / enp0s3| B
     B -->|DHCP/TFTP & iPXE Boot| C
     B -->|DHCP/TFTP & iPXE Boot| D
-    B -->|Export NFS /home| C
-    B -->|Export NFS /home| D
+    B -->|NFS Share /home| C
+    B -->|NFS Share /home| D
     B -.->|MPI Communications| C
     B -.->|MPI Communications| D
 ```
 
 ---
 
-## 3. Partie 1 : Mise en Place de LTSP et Démarrage Réseau
+## 3. Part 1: LTSP Setup and Network Booting
 
-La configuration du démarrage réseau LTSP et de la synchronisation filesystem a été réalisée selon une méthodologie rigoureuse.
+Configuring network booting and filesystem synchronization was completed through a structured approach.
 
-### 3.1 Configuration Réseau du Maître
-L'interface réseau interne a été paramétrée statiquement pour servir de passerelle locale.
+### 3.1 Network Configuration on Master
+The internal host-only interface was statically configured to act as the local gateway.
 
 `![[SCREENSHOT: Configuration de l'interface réseau interne enp0s8 sur le serveur Master]]`
 
-### 3.2 Configuration et initialisation de LTSP
-LTSP centralise la configuration des clients via le fichier `/etc/ltsp/ltsp.conf`. Notre implémentation intègre le montage dynamique NFS de `/home` pour assurer un espace de stockage persistant et partagé :
+### 3.2 LTSP Configuration and Initialization
+LTSP centralizes client behaviors via the configuration file `/etc/ltsp/ltsp.conf`. Our implementation integrates a dynamic NFS mount of `/home` to ensure storage persistence and real-time sharing:
 
 ```ini
 # /etc/ltsp/ltsp.conf
@@ -117,63 +117,63 @@ KEEP_SYSTEM_SERVICES="ssh"
 FSTAB_HOME="192.168.56.1:/home /home nfs defaults,nolock 0 0"
 ```
 
-Le partage NFS a été activé sur le Master en modifiant `/etc/exports` pour autoriser le subnet du cluster à lire et écrire dans `/home` :
+The NFS share was activated on the Master by modifying `/etc/exports` to authorize read/write access to the `/home` directory for the cluster's subnet:
 ```text
 /home 192.168.56.0/24(rw,sync,no_subtree_check,no_root_squash)
 ```
 
 ---
 
-### 3.3 🚨 Résolution Critique du Bug SSH des Clients Sans Disque (Analyse & Fix)
+### 3.3 🚨 Critical Troubleshooting of the Diskless Client SSH Bug (Analysis & Fix)
 
-L'un des défis techniques majeurs résolus au cours de ce projet a été le **refus systématique de connexion SSH (port 22) sur les clients LTSP**. Le diagnostic précis et la résolution de ce problème constituent une valeur ajoutée académique et technique clé.
+One of the major technical hurdles overcome during this project was the **systemic SSH connection refusal (port 22) on all LTSP client nodes**. The precise diagnostic and resolution of this issue represents a key technical and academic value add.
 
-#### 1. Symptômes
-Après le démarrage réseau, les clients esclaves `192.168.56.181` et `192.168.56.199` répondaient parfaitement aux pings réseau. Cependant, toute tentative de connexion SSH retournait un message d'erreur immédiat :
+#### 1. Symptoms
+Following a successful PXE boot, the slave nodes (`192.168.56.181` and `192.168.56.199`) responded perfectly to network pings. However, all SSH connection attempts failed immediately:
 ```bash
 ssh: connect to host 192.168.56.181 port 22: Connection refused
 ```
 
-#### 2. Diagnostic & Découvertes Techniques
-Nous avons exécuté `systemctl status ssh` directement via la console GUI de l'un des clients esclaves.
+#### 2. Diagnostics & Technical Discoveries
+We logged into the graphical console of one of the diskless clients and executed `systemctl status ssh`.
 
 `![[SCREENSHOT: Statut failed de sshd.service sur l'esclave montrant ExecStartPre status 1]]`
 
-Deux causes profondes interdépendantes ont été découvertes dans la conception par défaut de LTSP :
-1.  **Désactivation hardcodée des services :** LTSP possède un script d'initialisation client (`/usr/share/ltsp/client/init/56-services.sh`) qui désactive explicitement `ssh` à chaque boot pour préserver les ressources des terminaux légers, ignorant la directive `KEEP_SYSTEM_SERVICES="ssh"` dans certaines versions.
-2.  **Exclusion des clés d'hôte SSH (SSH Host Keys) :** Dans `/usr/share/ltsp/server/image/image.excludes`, le répertoire `etc/ssh/ssh_host_*` est configuré par défaut pour exclure toutes les clés privées d'hôte SSH lors de la génération de l'image SquashFS (pour éviter le partage de clés privées). Or, en environnement sans disque et en lecture seule, systemd SSH nécessite ces clés d'hôte. Sans elles, l'étape de pré-démarrage `ExecStartPre=/usr/sbin/sshd -t` échouait systématiquement, provoquant la mort immédiate du démon SSH.
+We discovered two deep, interconnected issues hardcoded in LTSP's default architecture:
+1.  **Hardcoded Service Disabling:** LTSP includes a client-side initialization script (`/usr/share/ltsp/client/init/56-services.sh`) that explicitly disables `ssh` on every boot to conserve lightweight terminal resources, overriding the `KEEP_SYSTEM_SERVICES="ssh"` directive in several versions.
+2.  **SSH Host Keys Exclusion:** In `/usr/share/ltsp/server/image/image.excludes`, the pattern `etc/ssh/ssh_host_*` is excluded by default from the SquashFS image compilation (to avoid cloning server private keys). However, on a read-only diskless client filesystem, systemd's SSH service requires these pre-generated keys at startup. Without them, the configuration pre-test `ExecStartPre=/usr/sbin/sshd -t` fails immediately, killing the SSH daemon before it can bind to port 22.
 
-#### 3. Résolution Appliquée
-Pour corriger définitivement ces bugs système :
-*   **Modification du Script d'Init :** Nous avons commenté la ligne `ssh` dans le script `/usr/share/ltsp/client/init/56-services.sh` pour empêcher LTSP de désactiver le service :
+#### 3. Resolution Applied
+To fix these bugs permanently:
+*   **Init Script Surgical Edit:** We commented out `ssh` from the disabled services list inside `/usr/share/ltsp/client/init/56-services.sh`:
     ```bash
     # ssh                      # OpenBSD Secure Shell server (kept for MPI cluster)
     ```
-*   **Modification des Exclusions de l'Image :** Nous avons commenté l'exclusion des clés d'hôte SSH dans `/usr/share/ltsp/server/image/image.excludes` pour permettre l'inclusion sécurisée de clés pré-générées dans l'image système des clients :
+*   **Image Excludes Modification:** We commented out the host key exclusion rule in `/usr/share/ltsp/server/image/image.excludes` to preserve keys in the SquashFS compilation:
     ```text
     # etc/ssh/ssh_host_*
     ```
-*   **Compilation Réseau & Mise en Cache :** Nous avons étendu l'espace disque de la VM Master de 10 Go supplémentaires pour éviter la saturation du disque `/dev/sda3`, puis compilé l'image SquashFS finale avec succès :
+*   **Compilation & Rebuilding:** We expanded the master VM's virtual disk size by 10 GB to avoid disk saturation during build and successfully compiled the SquashFS client filesystem image:
     ```bash
     sudo ltsp image /
     sudo ltsp initrd
     sudo ltsp ipxe
     ```
 
-Grâce à ces interventions chirurgicales sur les scripts d'initialisation LTSP, le démarrage réseau des clients a pu se faire avec un serveur SSH natif, fonctionnel et parfaitement sécurisé.
+Following these configurations, client nodes successfully booted with a native, active, and passwordless SSH service.
 
 `![[SCREENSHOT: Boot réseau PXE réussi de l'esclave chargeant l'image avec SSH actif]]`
 
 ---
 
-## 4. Partie 2 : Automatisation avec Ansible
+## 4. Part 2: Automation with Ansible
 
-Une fois le réseau et SSH stabilisés, nous avons conçu un playbook d'automatisation Ansible (`setup_cluster.yml`) pour orchestrer l'infrastructure à la volée.
+With SSH connectivity fully stabilized, we developed an Ansible playbook (`setup_cluster.yml`) to dynamically manage the infrastructure.
 
-### 4.1 Stratégie d'Automatisation Ansible
-Le cluster étant hétérogène et dynamique, l'adresse IP des clients peut changer d'une session à l'autre selon l'état du serveur DHCP. 
+### 4.1 Ansible Automation Strategy
+Because client IPs are dynamically assigned via DHCP, their host addresses can change between sessions. 
 
-Le playbook lit dynamiquement le fichier `/var/lib/misc/dnsmasq.leases` généré par le serveur DHCP `dnsmasq` pour découvrir l'infrastructure, filtre les adresses IP pour ne garder que les machines actuellement allumées (via des pings ICMP), et met à jour le fichier `hostfile` de configuration pour OpenMPI.
+The Ansible playbook reads the active leases file `/var/lib/misc/dnsmasq.leases` on the master, performs a fast ICMP ping against discovered IPs to filter out offline historical nodes, and dynamically writes a clean, up-to-date OpenMPI `hostfile`.
 
 ```yaml
 # /home/slave/Desktop/CHP-MINI-PROJECT/setup_cluster.yml
@@ -229,19 +229,19 @@ Le playbook lit dynamiquement le fichier `/var/lib/misc/dnsmasq.leases` génér�
 
 ---
 
-## 5. Partie 3 : Déploiement et Test MPI
+## 5. Part 3: MPI Deployment and Verification
 
-Pour valider le déploiement physique et réseau du cluster, nous avons configuré une exécution parallèle via le réseau local.
+To validate the cluster's parallel processing capabilities, we configured a multi-node parallel run.
 
-### 5.1 Compilation et Exécution Multi-nœuds
-Parce que le système de fichiers `/home` est partagé dynamiquement par NFS entre tous les nœuds esclaves, il suffit de compiler le fichier source C sur le Master. Les clients y ont accès instantanément !
+### 5.1 Compilation and Multi-node Execution
+Because `/home` is shared dynamically via NFS across the network, we only need to compile our code on the Master node. All client machines have real-time access to the compiled binary!
 
-#### Commande de compilation sur le Master :
+#### Compilation Command on Master:
 ```bash
 mpicc -O3 -o mpi_benchmark mpi_benchmark.c
 ```
 
-#### Commande d'exécution manuelle (4 processus MPI répartis sur le cluster) :
+#### Manual Run Command (4 MPI processes distributed across the cluster):
 ```bash
 mpirun --hostfile /home/slave/hostfile -np 4 ./mpi_benchmark
 ```
@@ -250,17 +250,17 @@ mpirun --hostfile /home/slave/hostfile -np 4 ./mpi_benchmark
 
 ---
 
-## 6. Partie 4 : Expérimentation et Analyse des Performances
+## 6. Part 4: Experimentation and Performance Analysis
 
-Pour évaluer de manière académique la performance et l'efficacité globale du cluster hétérogène, nous avons conçu un algorithme de multiplication de matrices parallèles de dimension $N \times N$, avec $N = 800$.
+To perform a rigorous academic performance evaluation, we developed a parallel matrix multiplication benchmark ($N \times N$, $N=800$).
 
-### 6.1 Algorithme MPI Implémenté (`mpi_benchmark.c`)
-L'implémentation repose sur le modèle Maître-Ouvrier (Master-Worker). Le Master (Rank 0) initialise les matrices $A$ et $B$. Il distribue ensuite des tranches de lignes de la matrice $A$ ainsi que l'intégralité de la matrice $B$ à chaque ouvrier (Workers, Ranks $> 0$). Les ouvriers effectuent le calcul parallèle localement et renvoient leurs lignes calculées au Master, qui réassemble la matrice finale $C$.
+### 6.1 Implemented MPI Algorithm (`mpi_benchmark.c`)
+The code utilizes a Master-Worker model. The Master (Rank 0) initializes matrices $A$ and $B$, partitions matrix $A$ by rows, and distributes these rows along with the entire matrix $B$ to active workers (Ranks $> 0$). Workers compute their parts locally and send results back to Rank 0, which gathers them into the final matrix $C$.
 
-L'implémentation intègre une journalisation verbeuse ANSI et des notifications de progression en temps réel pour faciliter la démonstration visuelle :
+The implementation features detailed ANSI terminal color-coded messages and worker computation progress updates:
 
 ```c
-// Extrait de l'affichage de progression des Workers dans mpi_benchmark.c
+// Worker computation progress loop inside mpi_benchmark.c
 for (int i = 0; i < rows; i++) {
     for (int j = 0; j < N; j++) {
         for (int k = 0; k < N; k++) {
@@ -274,10 +274,10 @@ for (int i = 0; i < rows; i++) {
 }
 ```
 
-### 6.2 Résultats Expérimentaux (Tableau des Mesures)
-Pour chaque configuration de cœurs (1, 2, 4, 6 processus), nous avons mesuré le temps d'exécution réel, calculé le **Speedup** ($S_p = \frac{T_1}{T_p}$) et l'**Efficacité** ($E_p = \frac{S_p}{p}$), où $p$ est le nombre total de processus de calcul.
+### 6.2 Experimental Results (Measurements Table)
+We ran the experiments across multiple core configurations (1, 2, 4, and 6 processes) to measure execution times, calculating **Speedup** ($S_p = \frac{T_1}{T_p}$) and **Efficiency** ($E_p = \frac{S_p}{p}$):
 
-| Nœuds (NP) | Description Configuration | Temps d'exécution | Speedup | Efficacité |
+| Nodes (NP) | Configuration Description | Execution Time | Speedup | Efficiency |
 | :---: | :--- | :---: | :---: | :---: |
 | 1 | 1 Local Process (Baseline) | 0.3659s | 1.00x | 100.0% |
 | 2 | 2 Processes (Master + 1 Worker) | 0.3937s | 0.93x | 46.5% |
@@ -290,45 +290,49 @@ Pour chaque configuration de cœurs (1, 2, 4, 6 processus), nous avons mesuré l
 
 ---
 
-### 6.3 Analyse Académique des Résultats
+### 6.3 Academic Performance Analysis
 
-#### 1. Analyse du Surcoût Réseau (Communication Overhead)
-Nous observons que lors du passage de 1 à 2 processus ($NP=2$), le temps d'exécution augmente légèrement, passant de `0.3659s` à `0.3937s`. Cette baisse d'efficacité s'explique par la nature de notre architecture virtualisée. 
+#### 1. Communication Network Overhead Analysis
+When moving from 1 to 2 processes ($NP=2$), execution time slightly increases from `0.3659s` to `0.3937s`. This efficiency drop is caused by our virtualized infrastructure.
 
-Les communications MPI transitent par une carte réseau émulée Host-Only dans VirtualBox. Pour une matrice $N=800$, la quantité de données échangée (Master envoyant des lignes de $A$ et toute la matrice $B$, et recevant le résultat $C$) est élevée par rapport à la quantité d'opérations mathématiques effectuées localement. Le temps requis pour sérialiser, transmettre par le réseau virtuel, et désérialiser les matrices dépasse le temps gagné par le calcul parallèle.
+MPI messages transit through VirtualBox's virtual host-only network adapter. For $N=800$, the volume of matrix data sent (Rank 0 scattering matrices and gathering results) is highly dominant compared to the computation volume. The time spent serializing, transferring over the network, and deserializing matrices exceeds the calculation time saved by parallelization.
 
-#### 2. Validation d'Amdahl et de Gustafson
-À $NP=6$ (répartis sur le Master et les deux clients Workers), nous constatons une accélération ($Speedup = 1.05x$, temps d'exécution réduit à `0.3482s`). À ce stade, la puissance brute fournie par les 5 ouvriers parallélisés commence enfin à compenser et amortir la latence réseau.
+#### 2. Amdahl's and Gustafson's Laws Verification
+At $NP=6$ (utilizing the master and both active PXE clients), we observe a positive speedup ($S_p = 1.05x$, reducing execution time to `0.3482s`). Here, the parallel processing power of the 5 distributed workers successfully overcomes the network communication latency.
 
-Cette observation illustre parfaitement :
-*   **La Loi d'Amdahl :** Le temps d'exécution parallèle est limité par la fraction séquentielle du programme (la phase de distribution des tâches par le Master Rank 0).
-*   **La Loi de Gustafson :** Pour rentabiliser pleinement les ressources parallèles de ce cluster LTSP, il convient d'augmenter massivement la charge de travail globale (par exemple, en passant à $N \ge 2000$). La complexité de calcul d'une multiplication de matrices croissant de façon cubique ($\mathcal{O}(N^3)$) tandis que la communication réseau ne croît que de façon quadratique ($\mathcal{O}(N^2)$), l'efficacité réseau augmentera drastiquement avec de grandes dimensions.
+This behavior highlights:
+*   **Amdahl's Law:** The speedup is limited by the sequential fraction of the program (the data distribution and gathering stages handled by Rank 0).
+*   **Gustafson's Law:** To achieve linear speedups on this architecture, the workload must scale up (e.g. $N \ge 2000$). Because matrix multiplication complexity grows cubically ($\mathcal{O}(N^3)$) while network communication data sizes grow quadratically ($\mathcal{O}(N^2)$), running larger matrix sizes will allow the cluster to achieve very high parallel efficiency.
 
 ---
 
-## 7. Extensions et Perspectives d'Équilibrage
+## 7. Extensions and Load Balancing Perspectives
 
-### 7.1 Allocation Pondérée des Processus MPI
-Dans un environnement de cluster hétérogène réel (par exemple, combinant un Master puissant avec des clients légers ou des Raspberry Pi lents), allouer le même nombre de processus (slots) à chaque nœud dégrade les performances globales. Le cluster est alors ralenti par son nœud le plus faible (phénomène du "straggler").
+### 7.1 Weighted Process Allocation in Heterogeneous Clusters
+In a real-world heterogeneous cluster (e.g., combining a powerful Master with slower network clients or lightweight ARM devices like Raspberry Pis), allocating the same number of processes to each node leads to bottlenecks, as the cluster runs at the speed of its slowest node (the "straggler" effect).
 
-Pour résoudre ce problème, OpenMPI permet une **allocation pondérée** via le paramètre `slots` du fichier `hostfile`. Nous pouvons configurer le playbook Ansible pour allouer les processus de calcul proportionnellement à la puissance relative (nombre de cœurs ou vitesse d'horloge CPU) de chaque nœud :
+To optimize this, OpenMPI supports **weighted core allocation** via the `slots` parameter in the `hostfile`. The Ansible playbook can be customized to distribute processes proportionally to the relative computational power of each node:
 
 ```text
-# Exemple de Hostfile MPI pondéré pour matériel hétérogène
-127.0.0.1 slots=4 max_slots=8       # Master puissant (ex: CPU Intel i7)
-192.168.56.181 slots=1 max_slots=2 # Ouvrier faible (ex: Raspberry Pi)
-192.168.56.199 slots=2 max_slots=4 # Ouvrier standard (ex: Vieux PC portable)
+# Example of a weighted OpenMPI hostfile
+127.0.0.1 slots=4 max_slots=8       # Powerful Master Node (e.g. Intel i7)
+192.168.56.181 slots=1 max_slots=2 # Slow Client Node (e.g. Raspberry Pi)
+192.168.56.199 slots=2 max_slots=4 # Medium Client Node (e.g. Older Laptop)
 ```
 
-### 7.2 Étude d'Impact du Boot Réseau
-L'absence de disque dur sur les clients esclaves élimine les coûts de stockage local mais augmente l'empreinte réseau globale lors du boot. Cependant, une fois le SquashFS monté en RAM locale et le répertoire utilisateur partagé par NFS, nous avons mesuré que l'impact sur le calcul MPI est nul, le code exécuté tournant entièrement dans l'espace mémoire physique RAM et CPU local de chaque machine.
+### 7.2 Network Booting Impact Study
+The diskless client architecture removes local storage costs but increases network boot latency. However, once the SquashFS operating system image is loaded into the client's local RAM and `/home` is mounted over NFS, the network boot has no negative impact on MPI execution, as computation runs natively in the CPU and local memory space of each node.
 
 ---
 
 ## 8. Conclusion
 
-Ce projet a permis de concevoir, déployer, et caractériser de manière rigoureuse un cluster CPU MPI hétérogène complet.
+This project successfully designed, deployed, and characterized a functional, heterogeneous CPU MPI cluster.
 
-En résolvant avec succès les blocages complexes inhérents au fonctionnement réseau de LTSP (le contournement de la désactivation d'OpenSSH et la réintégration des clés d'hôte de sécurité dans le système de fichiers SquashFS), nous avons prouvé qu'il est possible de monter une grille de calcul HPC robuste à moindre coût.
+By troubleshooting complex LTSP network boot behaviors (re-enabling OpenSSH and restoring SSH host keys to the SquashFS image filesystem), we have constructed a robust, low-cost parallel compute grid:
+*   **LTSP** provides instant, diskless client provisioning.
+*   **NFS** shares computational codes and outputs seamlessly in real-time.
+*   **Ansible** automates infrastructure discovery and hosts compilation.
+*   **OpenMPI** orchestrates high-performance parallel computation.
 
-L'intégration d'Ansible offre une élasticité remarquable à l'infrastructure en automatisant la découverte dynamique des clients esclaves. Enfin, les analyses de performances du benchmark de multiplication matricielle illustrent précisément les théories fondamentales de l'architecture distribuée (Amdahl, Gustafson), ouvrant la voie à des optimisations réelles d'équilibrage de charge pour le calcul scientifique intensif.
+The experimental analysis of the parallel matrix multiplication benchmark successfully illustrates the core laws of distributed computing (Amdahl, Gustafson), providing a solid foundation for real-world load-balanced scientific computing structures.
